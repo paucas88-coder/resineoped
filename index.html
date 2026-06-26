@@ -210,13 +210,21 @@ function load(){
     const cbName='_gs'+Date.now();
     const sc=document.createElement('script');
     window[cbName]=function(d){
-      try{['residents','evals','procs','guardias','casos','rots','stats','ciencia','licencias','comunidad'].forEach(k=>{if(Array.isArray(d[k]))S[k]=d[k];});S.rid=S.residents[0]?.id||null;}catch(e){console.error(e);}
+      try{
+        // Deduplicar por ID para evitar duplicados del redirect de Apps Script
+        ['residents','evals','procs','guardias','casos','rots','stats','ciencia','licencias','comunidad'].forEach(k=>{
+          if(Array.isArray(d[k]))S[k]=[...new Map(d[k].map(x=>[x.id,x])).values()];
+        });
+        S.rid=S.residents[0]?.id||null;
+      }catch(e){console.error(e);}
       delete window[cbName];if(sc.parentNode)sc.parentNode.removeChild(sc);
       setSt('ok');render();
     };
     sc.onerror=()=>{delete window[cbName];if(sc.parentNode)sc.parentNode.removeChild(sc);setSt('error');render();};
     sc.src=GS_URL+'?cb='+cbName+'&t='+Date.now();
     document.head.appendChild(sc);
+    // Timeout de seguridad: si no responde en 10s, render igual
+    setTimeout(()=>{if(window[cbName]){delete window[cbName];setSt('error');render();}},10000);
   }
 }
 function setSt(s){
@@ -254,9 +262,21 @@ function oSettings(){
 function saveGS(){
   const url=document.getElementById('fgsurl').value.trim();
   GS_URL=url;localStorage.setItem('gs_url',url);cm();
-  if(url)load(); else render();
+  const b=document.getElementById('gsBtn');
+  if(b){b.textContent=(GS_URL?'🟢 Sheets':'⚙️ Sheets');b.style.color=GS_URL?'var(--neo)':'var(--red)';}
+  if(url)// Si no hay URL configurada, abrir configuración automáticamente
+if(!IS_AS && !GS_URL){
+  setTimeout(()=>oSettings(), 800);
+} else {
+  load();
+} else render();
 }
-function clearGS(){GS_URL='';localStorage.removeItem('gs_url');cm();}
+function clearGS(){
+  GS_URL='';localStorage.removeItem('gs_url');
+  const b=document.getElementById('gsBtn');
+  if(b){b.textContent='⚙️ Sheets';b.style.color='var(--red)';}
+  cm();
+}
 
 // ============ RENDER ============
 function render(){rSel();rTabs();rContent();}
